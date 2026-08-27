@@ -29,21 +29,5 @@ h1{font-size:1.55rem;margin:.25rem 0 0;font-weight:750}h2{font-size:1.05rem;marg
 .amount-input span{font-weight:700;color:#777c82;font-size:.8rem}.amount-input input{border:0;outline:0;width:100%;min-height:52px;font-size:1.35rem;font-weight:750}
 @media (min-width:768px){.app-header{padding-top:40px}.balance-card{padding:30px}.bottom-nav{display:none}.quick-actions{bottom:28px}}
 
-.settings-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0}
-.settings-title{font-size:.9rem;font-weight:750}
-.settings-description{font-size:.76rem;color:var(--muted);margin-top:3px;line-height:1.45}
 
-.settings-danger-row{
-  width:100%;border:0;background:#fff;border:1px solid #f0d9d9;border-radius:16px;
-  padding:14px;text-align:left;display:flex;align-items:center;gap:12px;
-}
-.settings-danger-row:active{transform:scale(.99)}
-.settings-danger-icon,.reset-warning-icon{
-  width:40px;height:40px;border-radius:12px;background:#fff0f0;color:#c0392b;
-  display:grid;place-items:center;flex:0 0 auto;
-}
-.settings-copy{display:flex;flex-direction:column;flex:1;min-width:0}
-.settings-title{font-size:.9rem;font-weight:750;color:#b52d2d}
-.settings-description{font-size:.74rem;color:var(--muted);margin-top:3px;line-height:1.4}
-.settings-chevron{color:#a2a6ab}
-.reset-warning-icon{width:52px;height:52px;border-radius:16px;margin:auto;font-size:1.2rem}
+.settings-danger-row{width:100%;border:1px solid #f0d9d9;border-radius:16px;padding:14px;text-align:left;display:flex;align-items:center;gap:12px;background:#fff}.settings-danger-row:active{transform:scale(.99)}.settings-danger-icon,.reset-warning-icon{width:40px;height:40px;border-radius:12px;background:#fff0f0;color:#c0392b;display:grid;place-items:center;flex:0 0 auto}.settings-copy{display:flex;flex-direction:column;flex:1;min-width:0}.settings-title{font-size:.9rem;font-weight:750;color:#b52d2d}.settings-description{font-size:.74rem;color:#777;margin-top:3px;line-height:1.4}.settings-chevron{color:#a2a6ab}.reset-warning-icon{width:52px;height:52px;border-radius:16px;margin:auto;font-size:1.2rem}
