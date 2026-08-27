@@ -1,360 +1,138 @@
-// Family Finance V2 — robust frontend-only build.
-// Supabase will be connected later. For now data is stored in localStorage.
+// V1 frontend-only mode.
+// Supabase will be connected after the UI is verified.
+// This avoids a missing config.js from breaking the entire app.
 
 const DEFAULT_CATEGORIES = [
-  ["Rent","bi-house-door"],
-  ["Ooredoo Bill","bi-phone"],
-  ["Vodafone Broadband","bi-wifi"],
-  ["Kahramaa Bill","bi-lightning-charge"],
-  ["EMI","bi-credit-card"],
-  ["Petro","bi-fuel-pump"],
-  ["Car Wash","bi-car-front"],
-  ["Gym","bi-activity"],
-  ["Medical","bi-heart-pulse"],
-  ["Grocery","bi-cart3"],
-  ["Cinema","bi-film"],
-  ["Food","bi-egg-fried"],
-  ["Other","bi-three-dots"]
+  ["Rent","bi-house-door"],["Ooredoo Bill","bi-phone"],["Vodafone Broadband","bi-wifi"],
+  ["Kahramaa Bill","bi-lightning-charge"],["EMI","bi-credit-card"],["Petro","bi-fuel-pump"],
+  ["Car Wash","bi-car-front"],["Gym","bi-activity"],["Medical","bi-heart-pulse"],
+  ["Grocery-Lulu","bi-cart3"],["Cinema","bi-film"],["Food","bi-egg-fried"],["Baraha","bi-cup-straw"],["Other","bi-three-dots"]
 ];
 
-const state = {
-  transactions: [],
-  categories: DEFAULT_CATEGORIES.map(([name, icon]) => ({ name, icon }))
-};
+const money = n => new Intl.NumberFormat("en-QA",{style:"currency",currency:"QAR",maximumFractionDigits:2}).format(Number(n||0));
+const today = () => new Date().toISOString().slice(0,10);
+const state = { transactions: [], categories: [] };
 
-function localDate() {
-  const d = new Date();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${month}-${day}`;
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
+function iconFor(name){return state.categories.find(c=>c.name===name)?.icon||"bi-three-dots";}
+
+function loadData(){
+  const savedCategories = JSON.parse(localStorage.getItem("familyFinanceCategories")||"null");
+  state.categories = savedCategories || DEFAULT_CATEGORIES.map(([name,icon])=>({name,icon}));
+  const savedTransactions = JSON.parse(localStorage.getItem("familyFinanceLocal")||"null");
+  if(savedTransactions) state.transactions = savedTransactions;
 }
 
-function money(value) {
-  return new Intl.NumberFormat("en-QA", {
-    style: "currency",
-    currency: "QAR",
-    maximumFractionDigits: 2
-  }).format(Number(value || 0));
+function persist(){
+  localStorage.setItem("familyFinanceCategories",JSON.stringify(state.categories));
+  localStorage.setItem("familyFinanceLocal",JSON.stringify(state.transactions));
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  }[c]));
+function renderCategories(){
+  document.querySelector("#category").innerHTML = state.categories
+    .map(c=>`<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("");
 }
 
-function iconFor(category) {
-  const item = state.categories.find(c => c.name === category);
-  return item ? item.icon : "bi-three-dots";
+function render(){
+  const funds = state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount),0);
+  const expenses = state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount),0);
+  const month=today().slice(0,7);
+  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date).startsWith(month))
+    .reduce((s,t)=>s+Number(t.amount),0);
+  const balance=funds-expenses;
+  const pct=funds?Math.min(100,Math.max(0,expenses/funds*100)):0;
+
+  document.querySelector("#balance").textContent=money(balance);
+  document.querySelector("#incomeTotal").textContent=`${money(funds)} income`;
+  document.querySelector("#expenseTotal").textContent=`${money(expenses)} spent`;
+  document.querySelector("#incomeStat").textContent=money(funds);
+  document.querySelector("#monthStat").textContent=money(monthExpenses);
+  document.querySelector("#spendProgress").style.width=`${pct}%`;
+  document.querySelector("#progressLabel").textContent=funds?`${pct.toFixed(1)}% of income spent`:"No spending yet";
+
+  const list=[...state.transactions].sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))).slice(0,8);
+  document.querySelector("#transactions").innerHTML=list.length?list.map(t=>`
+    <div class="transaction">
+      <div class="tx-icon"><i class="bi ${t.type==="income"?"bi-arrow-down-left":iconFor(t.category)}"></i></div>
+      <div class="tx-main"><div class="tx-name">${escapeHtml(t.category)}</div>
+      <div class="tx-desc">${escapeHtml(t.description||"No description")} · ${escapeHtml(t.transaction_date)}</div></div>
+      <div class="tx-amount ${t.type==="income"?"tx-income":""}">${t.type==="income"?"+":"-"} ${money(t.amount)}</div>
+    </div>`).join(""):`<div class="text-center text-secondary py-5">No transactions yet.</div>`;
 }
 
-function loadData() {
-  // Categories: recover safely if an old/empty localStorage value exists.
-  try {
-    const savedCategories = JSON.parse(
-      localStorage.getItem("familyFinanceCategories") || "null"
-    );
-
-    if (Array.isArray(savedCategories) && savedCategories.length > 0) {
-      state.categories = savedCategories;
-    }
-  } catch (error) {
-    console.warn("Could not read saved categories:", error);
-  }
-
-  // Transactions: migrate old "fund" transactions to the new "income" model.
-  try {
-    const savedTransactions = JSON.parse(
-      localStorage.getItem("familyFinanceLocal") || "[]"
-    );
-
-    if (Array.isArray(savedTransactions)) {
-      state.transactions = savedTransactions.map(t => ({
-        ...t,
-        type: t.type === "fund" ? "income" : t.type
-      }));
-    }
-  } catch (error) {
-    console.warn("Could not read saved transactions:", error);
-    state.transactions = [];
-  }
-
-  saveData();
+function toast(message){
+  const el=document.querySelector("#appToast");el.querySelector(".toast-body").textContent=message;
+  bootstrap.Toast.getOrCreateInstance(el).show();
 }
 
-function saveData() {
-  localStorage.setItem(
-    "familyFinanceCategories",
-    JSON.stringify(state.categories)
-  );
-  localStorage.setItem(
-    "familyFinanceLocal",
-    JSON.stringify(state.transactions)
-  );
+loadData();
+renderCategories();
+document.querySelector("#date").value=today();
+document.querySelector("#incomeDate").value=today();
+render();
+
+document.querySelector("#expenseForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  state.transactions.push({
+    id:crypto.randomUUID(),type:"expense",amount:Number(document.querySelector("#amount").value),
+    category:document.querySelector("#category").value,description:document.querySelector("#description").value.trim(),
+    transaction_date:document.querySelector("#date").value
+  });
+  persist();e.target.reset();document.querySelector("#date").value=today();
+  bootstrap.Modal.getInstance(document.querySelector("#expenseModal")).hide();render();toast("Expense added");
+});
+
+document.querySelector("#incomeForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const source=document.querySelector("#incomeSource").value;
+  state.transactions.push({
+    id:crypto.randomUUID(),type:"income",amount:Number(document.querySelector("#incomeAmount").value),
+    category:source,description:document.querySelector("#incomeDescription").value.trim(),
+    transaction_date:document.querySelector("#incomeDate").value
+  });
+  persist();e.target.reset();document.querySelector("#incomeDate").value=today();
+  bootstrap.Modal.getInstance(document.querySelector("#incomeModal")).hide();render();toast("Income added");
+});
+
+document.querySelector("#viewAllBtn").addEventListener("click",()=>toast("Transactions screen is next"));
+
+
+// Settings / reset controls
+function showAppModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  bootstrap.Modal.getOrCreateInstance(el).show();
 }
 
-function renderCategories() {
-  const select = document.getElementById("category");
-  if (!select) return;
-
-  // Always guarantee a visible category list.
-  if (!state.categories.length) {
-    state.categories = DEFAULT_CATEGORIES.map(([name, icon]) => ({ name, icon }));
-  }
-
-  select.innerHTML = state.categories.map(category =>
-    `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`
-  ).join("");
-
-  select.selectedIndex = 0;
+function hideAppModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  bootstrap.Modal.getOrCreateInstance(el).hide();
 }
 
-function renderDashboard() {
-  const income = state.transactions
-    .filter(t => t.type === "income")
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-  const expenses = state.transactions
-    .filter(t => t.type === "expense")
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-  const currentMonth = localDate().slice(0, 7);
-
-  const monthExpenses = state.transactions
-    .filter(t =>
-      t.type === "expense" &&
-      String(t.transaction_date || "").startsWith(currentMonth)
-    )
-    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-  const balance = income - expenses;
-  const percentage = income > 0
-    ? Math.min(100, Math.max(0, (expenses / income) * 100))
-    : 0;
-
-  const balanceEl = document.getElementById("balance");
-  const incomeTotalEl = document.getElementById("incomeTotal");
-  const expenseTotalEl = document.getElementById("expenseTotal");
-  const incomeStatEl = document.getElementById("incomeStat");
-  const monthStatEl = document.getElementById("monthStat");
-  const progressEl = document.getElementById("spendProgress");
-  const progressLabelEl = document.getElementById("progressLabel");
-
-  if (balanceEl) balanceEl.textContent = money(balance);
-  if (incomeTotalEl) incomeTotalEl.textContent = `${money(income)} income`;
-  if (expenseTotalEl) expenseTotalEl.textContent = `${money(expenses)} spent`;
-  if (incomeStatEl) incomeStatEl.textContent = money(income);
-  if (monthStatEl) monthStatEl.textContent = money(monthExpenses);
-
-  if (progressEl) progressEl.style.width = `${percentage}%`;
-
-  if (progressLabelEl) {
-    progressLabelEl.textContent = income > 0
-      ? `${percentage.toFixed(1)}% of income spent`
-      : "Add income to start tracking spending";
-  }
-
-  renderTransactions();
-}
-
-function renderTransactions() {
-  const container = document.getElementById("transactions");
-  if (!container) return;
-
-  const list = [...state.transactions]
-    .sort((a, b) =>
-      String(b.transaction_date || "").localeCompare(
-        String(a.transaction_date || "")
-      )
-    )
-    .slice(0, 8);
-
-  if (!list.length) {
-    container.innerHTML = `
-      <div class="text-center text-secondary py-5">
-        <i class="bi bi-receipt fs-3 d-block mb-2"></i>
-        No transactions yet.
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = list.map(t => {
-    const isIncome = t.type === "income";
-    const title = isIncome
-      ? (t.category || "Income")
-      : (t.category || "Other");
-
-    return `
-      <div class="transaction">
-        <div class="tx-icon">
-          <i class="bi ${isIncome ? "bi-arrow-down-left" : iconFor(t.category)}"></i>
-        </div>
-
-        <div class="tx-main">
-          <div class="tx-name">${escapeHtml(title)}</div>
-          <div class="tx-desc">
-            ${escapeHtml(t.description || "No description")}
-            · ${escapeHtml(t.transaction_date || "")}
-          </div>
-        </div>
-
-        <div class="tx-amount ${isIncome ? "tx-income" : ""}">
-          ${isIncome ? "+" : "-"} ${money(t.amount)}
-        </div>
-      </div>`;
-  }).join("");
-}
-
-function showToast(message) {
-  const toastEl = document.getElementById("appToast");
-  if (!toastEl) return;
-
-  const body = toastEl.querySelector(".toast-body");
-  if (body) body.textContent = message;
-
-  bootstrap.Toast.getOrCreateInstance(toastEl).show();
-}
-
-function closeModal(id) {
-  const modalEl = document.getElementById(id);
-  if (!modalEl) return;
-
-  const modal = bootstrap.Modal.getInstance(modalEl);
-  if (modal) modal.hide();
-}
-
-function setupForms() {
-  const expenseForm = document.getElementById("expenseForm");
-
-  if (expenseForm) {
-    expenseForm.addEventListener("submit", event => {
-      event.preventDefault();
-
-      const amount = Number(document.getElementById("amount").value);
-
-      if (!amount || amount <= 0) return;
-
-      state.transactions.push({
-        id: crypto.randomUUID(),
-        type: "expense",
-        amount,
-        category: document.getElementById("category").value,
-        description: document.getElementById("description").value.trim(),
-        transaction_date: document.getElementById("date").value || localDate()
-      });
-
-      saveData();
-      renderDashboard();
-
-      expenseForm.reset();
-      document.getElementById("date").value = localDate();
-
-      closeModal("expenseModal");
-      showToast("Expense added");
-    });
-  }
-
-  const incomeForm = document.getElementById("incomeForm");
-
-  if (incomeForm) {
-    incomeForm.addEventListener("submit", event => {
-      event.preventDefault();
-
-      const amount = Number(document.getElementById("incomeAmount").value);
-
-      if (!amount || amount <= 0) return;
-
-      state.transactions.push({
-        id: crypto.randomUUID(),
-        type: "income",
-        amount,
-        category: document.getElementById("incomeSource").value,
-        description: document.getElementById("incomeDescription").value.trim(),
-        transaction_date: document.getElementById("incomeDate").value || localDate()
-      });
-
-      saveData();
-      renderDashboard();
-
-      incomeForm.reset();
-      document.getElementById("incomeDate").value = localDate();
-
-      closeModal("incomeModal");
-      showToast("Income added");
-    });
-  }
-}
-
-function setupDefaults() {
-  const date = document.getElementById("date");
-  const incomeDate = document.getElementById("incomeDate");
-
-  if (date) date.value = localDate();
-  if (incomeDate) incomeDate.value = localDate();
-
-  const viewAll = document.getElementById("viewAllBtn");
-  if (viewAll) {
-    viewAll.addEventListener("click", () => {
-      showToast("Transactions screen is next");
-    });
-  }
-}
-
-
-function resetTestData() {
-  // Clear storage first so the data is gone immediately.
+function resetAllData() {
   localStorage.removeItem("familyFinanceLocal");
   localStorage.removeItem("familyFinanceCategories");
-
-  // Clear in-memory state immediately.
   state.transactions = [];
-  state.categories = DEFAULT_CATEGORIES.map(([name, icon]) => ({
-    name,
-    icon
-  }));
-
-  // Refresh the visible UI immediately.
+  state.categories = DEFAULT_CATEGORIES.map(([name, icon]) => ({ name, icon }));
   renderCategories();
-  renderDashboard();
-
-  // Close confirmation and settings modals.
-  closeModal("resetConfirmModal");
-  closeModal("settingsModal");
-
-  // Repaint once more after Bootstrap closes the modal.
-  setTimeout(() => {
-    renderCategories();
-    renderDashboard();
-    showToast("All data cleared");
-  }, 150);
-
-  // Reload after a short delay to guarantee a completely fresh state
-  // and eliminate stale browser/GitHub Pages UI.
-  setTimeout(() => {
-    window.location.reload();
-  }, 650);
+  render();
+  hideAppModal("resetConfirmModal");
+  hideAppModal("settingsModal");
+  setTimeout(() => toast("All data cleared"), 150);
 }
 
-function init() {
-  loadData();
-  renderCategories();
-  setupDefaults();
-
-  const confirmResetButton = document.getElementById("confirmResetBtn");
-  if (confirmResetButton) {
-    confirmResetButton.addEventListener("click", resetTestData);
-  }
-
-  setupForms();
-  renderDashboard();
+function setupSettings() {
+  const settings = document.querySelector("#settingsBtn");
+  const close = document.querySelector("#closeSettingsBtn");
+  const reset = document.querySelector("#resetDataBtn");
+  const cancel = document.querySelector("#cancelResetBtn");
+  const confirm = document.querySelector("#confirmResetBtn");
+  if (settings) settings.addEventListener("click", () => showAppModal("settingsModal"));
+  if (close) close.addEventListener("click", () => hideAppModal("settingsModal"));
+  if (reset) reset.addEventListener("click", () => showAppModal("resetConfirmModal"));
+  if (cancel) cancel.addEventListener("click", () => hideAppModal("resetConfirmModal"));
+  if (confirm) confirm.addEventListener("click", resetAllData);
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
-}
+setupSettings();
