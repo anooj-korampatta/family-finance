@@ -6,7 +6,7 @@
   <title>Family Finance</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260825">
+  <link rel="stylesheet" href="css/style.css?v=20260827-gearfix">
 </head>
 <body>
 <div id="app-shell">
@@ -15,7 +15,7 @@
       <div class="eyebrow">FAMILY FINANCE</div>
       <h1>Good morning</h1>
     </div>
-    <button class="icon-btn" id="settingsBtn" aria-label="Settings" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear"></i></button>
+    <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings"><i class="bi bi-gear"></i></button>
   </header>
 
   <main class="container-fluid app-container">
@@ -142,11 +142,47 @@
   </div>
 </div>
 
+<!-- Settings -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content app-modal">
+      <div class="modal-header border-0">
+        <div><div class="eyebrow">SETTINGS</div><h3 class="modal-title">App settings</h3></div>
+        <button type="button" class="btn-close" id="closeSettingsBtn" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-0">
+        <button type="button" class="settings-danger-row" id="resetDataBtn">
+          <span class="settings-danger-icon"><i class="bi bi-trash3"></i></span>
+          <span class="settings-copy"><span class="settings-title">Reset all data</span><span class="settings-description">Delete all locally saved income, expenses and custom categories.</span></span>
+          <i class="bi bi-chevron-right settings-chevron"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset confirmation -->
+<div class="modal fade" id="resetConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content app-modal">
+      <div class="modal-body text-center p-4">
+        <div class="reset-warning-icon"><i class="bi bi-trash3"></i></div>
+        <h3 class="modal-title mt-3">Delete all data?</h3>
+        <p class="text-secondary small mt-2 mb-4">This will permanently clear all test income, expenses and custom categories from this browser.</p>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-light flex-fill" id="cancelResetBtn">Cancel</button>
+          <button type="button" class="btn btn-danger flex-fill" id="confirmResetBtn">Delete all data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
   <div id="appToast" class="toast" role="alert"><div class="toast-body"></div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="js/app.js?v=20260825"></script>
+<script src="js/app.js?v=20260827-gearfix"></script>
 </body>
 </html>
