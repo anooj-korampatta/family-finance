@@ -28,6 +28,7 @@ function showSkeleton(showIt){
   }
 }
 
+
 function toast(message){
   const el=document.querySelector("#appToast");
   if(!el)return;
