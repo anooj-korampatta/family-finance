@@ -275,7 +275,8 @@ function setup(){
       if(id){await updateTransaction(id,"expense",form);delete modal.dataset.editingId;toast("Expense updated");}
       else {await addTransaction("expense",form);toast("Expense added");}
       form.reset();document.querySelector("#date").value=today();
-      modal?.querySelector(".modal-title").textContent="Add expense";
+      const titleEl = modal?.querySelector(".modal-title");
+      if(titleEl) titleEl.textContent="Add expense";
       button.textContent="Add expense";hideModal("expenseModal");
     }catch(error){toast(error.message);}
     finally{setBusy(button,false,button.dataset.originalText||"Add expense");}
@@ -291,7 +292,8 @@ function setup(){
       if(id){await updateTransaction(id,"income",form);delete modal.dataset.editingId;toast("Income updated");}
       else {await addTransaction("income",form);toast("Income added");}
       form.reset();document.querySelector("#incomeDate").value=today();
-      modal?.querySelector(".modal-title").textContent="Add income";
+      const titleEl = modal?.querySelector(".modal-title");
+      if(titleEl) titleEl.textContent="Add income";
       button.textContent="Add income";hideModal("incomeModal");
     }catch(error){toast(error.message);}
     finally{setBusy(button,false,button.dataset.originalText||"Add income");}
