@@ -11,7 +11,8 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
-const state = { transactions: [], categories: [], familyId: null, user: null, channel: null, loading: false };
+const state = { transactions: [], categories: [], familyId: null, user: null, channel: null, loading: false, page: 1 };
+const PAGE_SIZE = 10;
 let db = null;
 
 function escapeHtml(v){return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
@@ -27,7 +28,6 @@ function showSkeleton(showIt){
     list.innerHTML = `<div class="skeleton-list">${Array.from({length:4},()=>`<div class="skeleton-row"><span class="skeleton-circle"></span><span class="skeleton-lines"><i></i><i></i></span><span class="skeleton-amount"></span></div>`).join("")}</div>`;
   }
 }
-
 
 function toast(message){
   const el=document.querySelector("#appToast");
@@ -108,16 +108,69 @@ function render(){
   document.querySelector("#monthStat").textContent=money(monthExpenses);
   document.querySelector("#spendProgress").style.width=`${pct}%`;
   document.querySelector("#progressLabel").textContent=funds?`${pct.toFixed(1)}% of income spent`:"Add income to start tracking spending";
-  const list=[...state.transactions].slice(0,8);
-  document.querySelector("#transactions").innerHTML=list.length?list.map(t=>`
-    <div class="transaction">
+
+  const listEl=document.querySelector("#transactions");
+  const ordered=[...state.transactions].sort((a,b)=>String(b.transaction_date||"").localeCompare(String(a.transaction_date||""))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
+  const totalPages=Math.max(1,Math.ceil(ordered.length/PAGE_SIZE));
+  state.page=Math.min(Math.max(1,state.page),totalPages);
+  const pageItems=ordered.slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE);
+
+  listEl.innerHTML=pageItems.length?pageItems.map(t=>{
+    const mine=state.user && t.user_id===state.user.id;
+    return `<div class="transaction">
       <div class="tx-icon"><i class="bi ${t.type==="income"?"bi-arrow-down-left":iconFor(t.category)}"></i></div>
       <div class="tx-main"><div class="tx-name">${escapeHtml(t.category)}</div>
       <div class="tx-desc">${escapeHtml(t.description||"No description")} · ${escapeHtml(t.transaction_date)}</div></div>
       <div class="tx-amount ${t.type==="income"?"tx-income":""}">${t.type==="income"?"+":"-"} ${money(t.amount)}</div>
-    </div>`).join(""):`<div class="text-center text-secondary py-5">No transactions yet.</div>`;
+      ${mine?`<button type="button" class="tx-menu-btn" data-tx-menu="${escapeHtml(t.id)}" aria-label="Transaction actions"><i class="bi bi-three-dots"></i></button>`:""}
+    </div>`;
+  }).join(""):`<div class="text-center text-secondary py-5">No transactions yet.</div>`;
+
+  listEl.querySelectorAll("[data-tx-menu]").forEach(btn=>btn.addEventListener("click",()=>openTransactionActions(btn.dataset.txMenu)));
+  renderPagination(totalPages);
 }
 
+function renderPagination(totalPages){
+  let nav=document.querySelector("#transactionPagination");
+  if(!nav){nav=document.createElement("div");nav.id="transactionPagination";nav.className="transaction-pagination";document.querySelector("#transactions")?.after(nav);}
+  if(totalPages<=1){nav.innerHTML="";return;}
+  let buttons="";
+  for(let i=1;i<=totalPages;i++) buttons+=`<button type="button" class="page-btn ${i===state.page?"active":""}" data-page="${i}">${i}</button>`;
+  nav.innerHTML=`<button type="button" class="page-arrow" data-page="${state.page-1}" ${state.page===1?"disabled":""} aria-label="Previous"><i class="bi bi-chevron-left"></i></button>${buttons}<button type="button" class="page-arrow" data-page="${state.page+1}" ${state.page===totalPages?"disabled":""} aria-label="Next"><i class="bi bi-chevron-right"></i></button>`;
+  nav.querySelectorAll("[data-page]").forEach(btn=>btn.addEventListener("click",()=>{const p=Number(btn.dataset.page);if(p>=1&&p<=totalPages&&p!==state.page){state.page=p;render();}}));
+}
+
+function openTransactionActions(id){
+  const t=state.transactions.find(x=>x.id===id);
+  if(!t||!state.user||t.user_id!==state.user.id)return;
+  const old=document.querySelector("#transactionActionsModal");if(old)old.remove();
+  const modal=document.createElement("div");modal.className="modal fade";modal.id="transactionActionsModal";modal.tabIndex=-1;
+  modal.innerHTML=`<div class="modal-dialog modal-dialog-centered"><div class="modal-content app-modal"><div class="modal-header border-0"><div><div class="eyebrow">TRANSACTION</div><h3 class="modal-title">${escapeHtml(t.category)}</h3></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body pt-0"><button type="button" class="action-row" id="editTx"><i class="bi bi-pencil"></i><span>Edit transaction</span><i class="bi bi-chevron-right ms-auto"></i></button><button type="button" class="action-row danger" id="deleteTx"><i class="bi bi-trash3"></i><span>Delete transaction</span><i class="bi bi-chevron-right ms-auto"></i></button></div></div></div>`;
+  document.body.appendChild(modal);const instance=bootstrap.Modal.getOrCreateInstance(modal);instance.show();
+  modal.querySelector("#editTx").onclick=()=>{instance.hide();setTimeout(()=>openEditTransaction(t),150);};
+  modal.querySelector("#deleteTx").onclick=()=>{instance.hide();setTimeout(()=>deleteTransaction(t),150);};
+  modal.addEventListener("hidden.bs.modal",()=>modal.remove(),{once:true});
+}
+
+function openEditTransaction(t){
+  const modalId=t.type==="income"?"incomeModal":"expenseModal";const modal=document.querySelector(`#${modalId}`);if(!modal)return;
+  const q=id=>document.querySelector(id);
+  q(t.type==="income"?"#incomeAmount":"#amount").value=t.amount;
+  q(t.type==="income"?"#incomeDescription":"#description").value=t.description||"";
+  q(t.type==="income"?"#incomeDate":"#date").value=t.transaction_date||today();
+  if(t.type==="income") q("#incomeSource").value=t.category||"Other";
+  else {q("#category").value=t.category||"Other";renderCategoryChips();}
+  modal.dataset.editingId=t.id;modal.querySelector(".modal-title").textContent=t.type==="income"?"Edit income":"Edit expense";modal.querySelector('button[type="submit"]').textContent="Save changes";
+  showModal(modalId);
+}
+
+async function deleteTransaction(t){
+  if(!state.user||t.user_id!==state.user.id)return;
+  if(!window.confirm(`Delete this ${t.type} of ${money(t.amount)}?`))return;
+  const {error}=await db.from("transactions").delete().eq("id",t.id).eq("user_id",state.user.id);
+  if(error){toast(error.message);return;}
+  state.page=1;await loadTransactions();render();toast("Transaction deleted");
+}
 function subscribeRealtime(){
   if(state.channel) db.removeChannel(state.channel);
   state.channel=db.channel(`family-finance-${state.familyId}`)
@@ -153,6 +206,18 @@ async function addTransaction(type, form){
     category=await createCategoryFromDescription(description);
   }
   const {error}=await db.from("transactions").insert({family_id:state.familyId,user_id:state.user.id,type,amount,category,description,transaction_date:date});
+  if(error)throw error;
+  await loadTransactions();render();
+}
+
+async function updateTransaction(id,type,form){
+  const amount=Number(form.querySelector(type==="income"?"#incomeAmount":"#amount").value);
+  const date=form.querySelector(type==="income"?"#incomeDate":"#date").value||today();
+  const description=form.querySelector(type==="income"?"#incomeDescription":"#description").value.trim();
+  let category=type==="income"?form.querySelector("#incomeSource").value:form.querySelector("#category").value;
+  if(!amount||amount<=0)throw new Error("Please enter a valid amount.");
+  if(type==="expense"&&category==="Other"&&description)category=await createCategoryFromDescription(description);
+  const {error}=await db.from("transactions").update({amount,category,description,transaction_date:date}).eq("id",id).eq("user_id",state.user.id);
   if(error)throw error;
   await loadTransactions();render();
 }
@@ -201,15 +266,23 @@ function setup(){
   });
   document.querySelector("#expenseForm").addEventListener("submit",async e=>{
     e.preventDefault();const button=e.submitter;setBusy(button,true,"Saving…");
-    try{await addTransaction("expense",e.target);e.target.reset();document.querySelector("#date").value=today();hideModal("expenseModal");toast("Expense added");}
-    catch(error){toast(error.message);}
-    finally{setBusy(button,false,"Add expense");}
+    try{
+      const id=e.currentTarget.closest(".modal")?.dataset.editingId;
+      if(id){await updateTransaction(id,"expense",e.target);delete e.currentTarget.closest(".modal").dataset.editingId;toast("Expense updated");}
+      else {await addTransaction("expense",e.target);toast("Expense added");}
+      e.target.reset();document.querySelector("#date").value=today();e.currentTarget.closest(".modal").querySelector(".modal-title").textContent="Add expense";button.textContent="Add expense";hideModal("expenseModal");
+    }catch(error){toast(error.message);}
+    finally{setBusy(button,false,button.dataset.originalText||"Add expense");}
   });
   document.querySelector("#incomeForm").addEventListener("submit",async e=>{
     e.preventDefault();const button=e.submitter;setBusy(button,true,"Saving…");
-    try{await addTransaction("income",e.target);e.target.reset();document.querySelector("#incomeDate").value=today();hideModal("incomeModal");toast("Income added");}
-    catch(error){toast(error.message);}
-    finally{setBusy(button,false,"Add income");}
+    try{
+      const id=e.currentTarget.closest(".modal")?.dataset.editingId;
+      if(id){await updateTransaction(id,"income",e.target);delete e.currentTarget.closest(".modal").dataset.editingId;toast("Income updated");}
+      else {await addTransaction("income",e.target);toast("Income added");}
+      e.target.reset();document.querySelector("#incomeDate").value=today();e.currentTarget.closest(".modal").querySelector(".modal-title").textContent="Add income";button.textContent="Add income";hideModal("incomeModal");
+    }catch(error){toast(error.message);}
+    finally{setBusy(button,false,button.dataset.originalText||"Add income");}
   });
   document.querySelector("#categorySearch").addEventListener("input",e=>renderCategoryChips(e.target.value));
   document.querySelector("#settingsBtn").addEventListener("click",()=>{document.querySelector("#currentUser").textContent=state.user?.email||"";showModal("settingsModal");});
@@ -218,7 +291,7 @@ function setup(){
   document.querySelector("#cancelResetBtn").addEventListener("click",()=>hideModal("resetConfirmModal"));
   document.querySelector("#confirmResetBtn").addEventListener("click",async()=>{try{await resetAllData();}catch(error){toast(error.message);}});
   document.querySelector("#logoutBtn").addEventListener("click",async()=>{hideModal("settingsModal");await signOut();});
-  document.querySelector("#viewAllBtn").addEventListener("click",()=>toast("Full transaction history is next"));
+  document.querySelector("#viewAllBtn").addEventListener("click",()=>{state.page=1;render();document.querySelector("#transactions")?.scrollIntoView({behavior:"smooth",block:"start"});});
 }
 
 const config=window.SUPABASE_CONFIG;
