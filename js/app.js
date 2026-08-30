@@ -265,22 +265,34 @@ function setup(){
     try{await signIn(document.querySelector("#loginEmail").value.trim(),document.querySelector("#loginPassword").value);}catch(error){document.querySelector("#loginError").textContent=error.message;show("loginError");}
   });
   document.querySelector("#expenseForm").addEventListener("submit",async e=>{
-    e.preventDefault();const button=e.submitter;setBusy(button,true,"Saving…");
+    e.preventDefault();
+    const form=e.currentTarget;
+    const modal=form.closest(".modal");
+    const button=e.submitter;
+    setBusy(button,true,"Saving…");
     try{
-      const id=e.currentTarget.closest(".modal")?.dataset.editingId;
-      if(id){await updateTransaction(id,"expense",e.target);delete e.currentTarget.closest(".modal").dataset.editingId;toast("Expense updated");}
-      else {await addTransaction("expense",e.target);toast("Expense added");}
-      e.target.reset();document.querySelector("#date").value=today();e.currentTarget.closest(".modal").querySelector(".modal-title").textContent="Add expense";button.textContent="Add expense";hideModal("expenseModal");
+      const id=modal?.dataset.editingId;
+      if(id){await updateTransaction(id,"expense",form);delete modal.dataset.editingId;toast("Expense updated");}
+      else {await addTransaction("expense",form);toast("Expense added");}
+      form.reset();document.querySelector("#date").value=today();
+      modal?.querySelector(".modal-title").textContent="Add expense";
+      button.textContent="Add expense";hideModal("expenseModal");
     }catch(error){toast(error.message);}
     finally{setBusy(button,false,button.dataset.originalText||"Add expense");}
   });
   document.querySelector("#incomeForm").addEventListener("submit",async e=>{
-    e.preventDefault();const button=e.submitter;setBusy(button,true,"Saving…");
+    e.preventDefault();
+    const form=e.currentTarget;
+    const modal=form.closest(".modal");
+    const button=e.submitter;
+    setBusy(button,true,"Saving…");
     try{
-      const id=e.currentTarget.closest(".modal")?.dataset.editingId;
-      if(id){await updateTransaction(id,"income",e.target);delete e.currentTarget.closest(".modal").dataset.editingId;toast("Income updated");}
-      else {await addTransaction("income",e.target);toast("Income added");}
-      e.target.reset();document.querySelector("#incomeDate").value=today();e.currentTarget.closest(".modal").querySelector(".modal-title").textContent="Add income";button.textContent="Add income";hideModal("incomeModal");
+      const id=modal?.dataset.editingId;
+      if(id){await updateTransaction(id,"income",form);delete modal.dataset.editingId;toast("Income updated");}
+      else {await addTransaction("income",form);toast("Income added");}
+      form.reset();document.querySelector("#incomeDate").value=today();
+      modal?.querySelector(".modal-title").textContent="Add income";
+      button.textContent="Add income";hideModal("incomeModal");
     }catch(error){toast(error.message);}
     finally{setBusy(button,false,button.dataset.originalText||"Add income");}
   });
