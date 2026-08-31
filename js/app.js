@@ -95,6 +95,89 @@ function selectCategory(name){
   renderCategoryChips();
 }
 
+
+const REPORT_GROUPS = {
+  "Supermarket": ["Grocery-Lulu", "Baraha"]
+};
+
+function reportMonthOptions(){
+  const months = new Set();
+  state.transactions.filter(t=>t.type==="expense").forEach(t=>{ if(t.transaction_date) months.add(String(t.transaction_date).slice(0,7)); });
+  months.add(today().slice(0,7));
+  return [...months].sort((a,b)=>b.localeCompare(a));
+}
+
+function formatMonth(key){
+  const [y,m]=key.split("-");
+  return new Intl.DateTimeFormat("en-US",{month:"long",year:"numeric"}).format(new Date(Number(y),Number(m)-1,1));
+}
+
+function renderReport(){
+  const select=document.querySelector("#reportMonth");
+  const list=document.querySelector("#reportCategories");
+  if(!select||!list)return;
+  const options=reportMonthOptions();
+  const current=select.value && options.includes(select.value) ? select.value : today().slice(0,7);
+  select.innerHTML=options.map(m=>`<option value="${m}">${formatMonth(m)}</option>`).join("");
+  select.value=current;
+
+  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date||"").startsWith(current));
+  const total=monthExpenses.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  document.querySelector("#reportTotal").textContent=money(total);
+  document.querySelector("#reportExpenseCount").textContent=`${monthExpenses.length} expense${monthExpenses.length===1?"":"s"}`;
+
+  const grouped=new Map();
+  const groupedSource=new Map();
+  monthExpenses.forEach(t=>{
+    let group=t.category||"Other";
+    for(const [name,cats] of Object.entries(REPORT_GROUPS)) if(cats.includes(group)) group=name;
+    grouped.set(group,(grouped.get(group)||0)+Number(t.amount||0));
+    if(!groupedSource.has(group))groupedSource.set(group,{});
+    const source=t.category||"Other";
+    groupedSource.get(group)[source]=(groupedSource.get(group)[source]||0)+Number(t.amount||0);
+  });
+
+  const rows=[...grouped.entries()].sort((a,b)=>b[1]-a[1]);
+  if(!rows.length){list.innerHTML=`<div class="report-empty"><i class="bi bi-bar-chart fs-4 d-block mb-2"></i>No expenses for ${formatMonth(current)}.</div>`;document.querySelector("#supermarketDetail")?.classList.add("d-none");return;}
+  list.innerHTML=rows.map(([name,amount])=>{
+    const pct=total?amount/total*100:0;
+    const icon=name==="Supermarket"?"bi-cart3":iconFor(name);
+    const clickable=name==="Supermarket";
+    return `<div class="report-category ${clickable?"clickable":""}" ${clickable?'data-report-group="Supermarket"':''}>
+      <div class="report-category-main"><div class="report-cat-icon"><i class="bi ${escapeHtml(icon)}"></i></div><div class="report-cat-copy"><div class="report-cat-name">${escapeHtml(name)}</div><div class="report-cat-meta">${pct.toFixed(1)}% of spending${clickable?" · Tap for split":""}</div></div><div class="report-cat-amount">${money(amount)}</div></div>
+      <div class="report-bar"><span style="width:${pct}%"></span></div>
+    </div>`;
+  }).join("");
+
+  list.querySelector('[data-report-group="Supermarket"]')?.addEventListener("click",()=>renderSupermarketSplit(groupedSource.get("Supermarket")||{}));
+}
+
+function renderSupermarketSplit(source){
+  const box=document.querySelector("#supermarketDetail");
+  const wrap=document.querySelector("#supermarketSplit");
+  if(!box||!wrap)return;
+  const rows=Object.entries(source).sort((a,b)=>b[1]-a[1]);
+  const total=rows.reduce((s,[,v])=>s+v,0);
+  document.querySelector("#supermarketTotal").textContent=money(total);
+  wrap.innerHTML=rows.map(([name,amount])=>{
+    const pct=total?amount/total*100:0;
+    return `<div class="supermarket-row"><div class="supermarket-copy"><div class="supermarket-name">${escapeHtml(name)}</div><div class="supermarket-bar"><span style="width:${pct}%"></span></div></div><div class="supermarket-amount">${money(amount)}<div class="report-cat-meta">${pct.toFixed(1)}%</div></div></div>`;
+  }).join("");
+  box.classList.remove("d-none");
+}
+
+function showHome(){
+  document.querySelector("main.app-container")?.classList.remove("d-none");
+  document.querySelector("#reportsView")?.classList.add("d-none");
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",!b.dataset.nav));
+}
+function showReports(){
+  document.querySelector("main.app-container")?.classList.add("d-none");
+  document.querySelector("#reportsView")?.classList.remove("d-none");
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.nav==="reports"));
+  renderReport();
+}
+
 function render(){
   const funds=state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0);
   const expenses=state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
@@ -128,6 +211,7 @@ function render(){
 
   listEl.querySelectorAll("[data-tx-menu]").forEach(btn=>btn.addEventListener("click",()=>openTransactionActions(btn.dataset.txMenu)));
   renderPagination(totalPages);
+  if(!document.querySelector("#reportsView")?.classList.contains("d-none")) renderReport();
 }
 
 function renderPagination(totalPages){
@@ -306,6 +390,9 @@ function setup(){
   document.querySelector("#confirmResetBtn").addEventListener("click",async()=>{try{await resetAllData();}catch(error){toast(error.message);}});
   document.querySelector("#logoutBtn").addEventListener("click",async()=>{hideModal("settingsModal");await signOut();});
   document.querySelector("#viewAllBtn").addEventListener("click",()=>{state.page=1;render();document.querySelector("#transactions")?.scrollIntoView({behavior:"smooth",block:"start"});});
+  document.querySelector('[data-nav="reports"]')?.addEventListener("click",showReports);
+  document.querySelector('.nav-item:not([data-nav="reports"])')?.addEventListener("click",showHome);
+  document.querySelector("#reportMonth")?.addEventListener("change",()=>{document.querySelector("#supermarketDetail")?.classList.add("d-none");renderReport();});
 }
 
 const config=window.SUPABASE_CONFIG;
