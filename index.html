@@ -80,6 +80,31 @@
     <section id="transactions" class="transaction-list"></section>
   </main>
 
+  <section id="reportsView" class="reports-view d-none">
+    <div class="reports-head">
+      <div>
+        <div class="eyebrow">REPORTING</div>
+        <h2>Spending report</h2>
+      </div>
+      <select id="reportMonth" class="report-month" aria-label="Report month"></select>
+    </div>
+
+    <div class="report-total-card">
+      <div><div class="muted-label">Total spending</div><div id="reportTotal" class="report-total">QAR 0.00</div></div>
+      <div class="report-total-icon"><i class="bi bi-pie-chart"></i></div>
+    </div>
+
+    <section class="report-card">
+      <div class="report-card-head"><div><div class="eyebrow">BREAKDOWN</div><h3>By category</h3></div><span id="reportExpenseCount" class="report-count">0 expenses</span></div>
+      <div id="reportCategories" class="report-category-list"></div>
+    </section>
+
+    <section class="report-card d-none" id="supermarketDetail">
+      <div class="report-card-head"><div><div class="eyebrow">SUPERMARKET</div><h3>Lulu + Baraha</h3></div><span id="supermarketTotal" class="report-count">QAR 0.00</span></div>
+      <div id="supermarketSplit" class="supermarket-split"></div>
+    </section>
+  </section>
+
   <div class="quick-actions">
     <button class="quick-btn income-btn" data-bs-toggle="modal" data-bs-target="#incomeModal">
       <i class="bi bi-plus-lg"></i><span>Add income</span>
@@ -91,8 +116,7 @@
 
   <nav class="bottom-nav">
     <button class="nav-item active"><i class="bi bi-house"></i><span>Home</span></button>
-    <button class="nav-item"><i class="bi bi-receipt"></i><span>Transactions</span></button>
-    <button class="nav-item"><i class="bi bi-bar-chart"></i><span>Insights</span></button>
+    <button class="nav-item" data-nav="reports" type="button"><i class="bi bi-bar-chart"></i><span>Reports</span></button>
   </nav>
 </div>
 
