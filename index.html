@@ -37,13 +37,30 @@
     <section class="balance-card">
       <div class="d-flex justify-content-between align-items-start">
         <div>
-          <div class="muted-label">Available balance</div>
-          <div id="balance" class="balance-value">QAR 0.00</div>
-        </div>
+  <div class="muted-label">Available balance</div>
+
+  <div class="balance-value-row">
+    <div id="balance" class="balance-value balance-hidden">
+      QAR ••••••••
+    </div>
+
+    <button
+      id="balanceVisibilityBtn"
+      class="balance-visibility-btn"
+      type="button"
+      aria-label="Show balance"
+      aria-pressed="false"
+    >
+      <i class="bi bi-eye"></i>
+    </button>
+  </div>
+</div>
         <span class="balance-badge"><i class="bi bi-wallet2"></i></span>
       </div>
       <div class="balance-meta">
-        <span id="incomeTotal">QAR 0.00 income</span>
+        <span id="incomeTotal" class="privacy-value">
+  QAR •••••••• income
+</span>
         <span id="expenseTotal">QAR 0.00 spent</span>
       </div>
       <div class="progress finance-progress">
