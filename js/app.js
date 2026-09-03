@@ -11,7 +11,7 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
-const state = { transactions: [], categories: [], familyId: null, user: null, channel: null, loading: false, page: 1 };
+const state = { transactions: [], categories: [], familyId: null, user: null, channel: null, loading: false, page: 1, balanceVisible: false };
 const PAGE_SIZE = 10;
 let db = null;
 
@@ -184,8 +184,16 @@ function render(){
   const month=today().slice(0,7);
   const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date).startsWith(month)).reduce((s,t)=>s+Number(t.amount||0),0);
   const pct=funds?Math.min(100,Math.max(0,expenses/funds*100)):0;
-  document.querySelector("#balance").textContent=money(funds-expenses);
-  document.querySelector("#incomeTotal").textContent=`${money(funds)} income`;
+  const balanceEl = document.querySelector("#balance");
+const incomeEl = document.querySelector("#incomeTotal");
+
+if (state.balanceVisible) {
+  balanceEl.textContent = money(balance);
+  incomeEl.textContent = `${money(funds)} income`;
+} else {
+  balanceEl.textContent = "QAR ••••••••";
+  incomeEl.textContent = "QAR •••••••• income";
+}
   document.querySelector("#expenseTotal").textContent=`${money(expenses)} spent`;
   document.querySelector("#incomeStat").textContent=money(funds);
   document.querySelector("#monthStat").textContent=money(monthExpenses);
@@ -393,6 +401,33 @@ function setup(){
   document.querySelector('[data-nav="reports"]')?.addEventListener("click",showReports);
   document.querySelector('.nav-item:not([data-nav="reports"])')?.addEventListener("click",showHome);
   document.querySelector("#reportMonth")?.addEventListener("change",()=>{document.querySelector("#supermarketDetail")?.classList.add("d-none");renderReport();});
+document
+  .querySelector("#balanceVisibilityBtn")
+  ?.addEventListener("click", () => {
+    state.balanceVisible = !state.balanceVisible;
+
+    const btn = document.querySelector("#balanceVisibilityBtn");
+    const icon = btn?.querySelector("i");
+
+    if (state.balanceVisible) {
+      btn?.setAttribute("aria-label", "Hide balance");
+      btn?.setAttribute("aria-pressed", "true");
+
+      if (icon) {
+        icon.className = "bi bi-eye-slash";
+      }
+    } else {
+      btn?.setAttribute("aria-label", "Show balance");
+      btn?.setAttribute("aria-pressed", "false");
+
+      if (icon) {
+        icon.className = "bi bi-eye";
+      }
+    }
+
+    render();
+  });
+  
 }
 
 const config=window.SUPABASE_CONFIG;
