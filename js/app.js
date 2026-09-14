@@ -6,12 +6,36 @@ const DEFAULT_CATEGORIES = [
   ["Baraha","bi-cup-straw"],["Other","bi-three-dots"]
 ];
 
-const money = n => new Intl.NumberFormat("en-QA",{style:"currency",currency:"QAR",maximumFractionDigits:2}).format(Number(n||0));
+const toAmount = value => {
+  const number = Number(
+    String(value ?? "")
+      .replace(/,/g, "")
+      .trim()
+  );
+
+  return Number.isFinite(number) ? number : 0;
+};
+
+const money = n =>
+  new Intl.NumberFormat("en-QA", {
+    style: "currency",
+    currency: "QAR",
+    maximumFractionDigits: 2
+  }).format(toAmount(n));
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
-const state = { transactions: [], categories: [], familyId: null, user: null, channel: null, loading: false, page: 1, balanceVisible: false };
+const state = {
+  transactions: [],
+  categories: [],
+  familyId: null,
+  user: null,
+  channel: null,
+  loading: false,
+  page: 1,
+  balanceVisible: false
+};
 const PAGE_SIZE = 10;
 let db = null;
 
