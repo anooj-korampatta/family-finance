@@ -146,7 +146,7 @@ function renderReport(){
   select.value=current;
 
   const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date||"").startsWith(current));
-  const total=monthExpenses.reduce((sum,t)=>sum+Number(t.amount||0),0);
+  const total=monthExpenses.reduce((sum,t)=>sum+toAmount(t.amount),0);
   document.querySelector("#reportTotal").textContent=money(total);
   document.querySelector("#reportExpenseCount").textContent=`${monthExpenses.length} expense${monthExpenses.length===1?"":"s"}`;
 
@@ -155,10 +155,10 @@ function renderReport(){
   monthExpenses.forEach(t=>{
     let group=t.category||"Other";
     for(const [name,cats] of Object.entries(REPORT_GROUPS)) if(cats.includes(group)) group=name;
-    grouped.set(group,(grouped.get(group)||0)+Number(t.amount||0));
+    grouped.set(group,(grouped.get(group)||0)+toAmount(t.amount));
     if(!groupedSource.has(group))groupedSource.set(group,{});
     const source=t.category||"Other";
-    groupedSource.get(group)[source]=(groupedSource.get(group)[source]||0)+Number(t.amount||0);
+    groupedSource.get(group)[source]=(groupedSource.get(group)[source]||0)+toAmount(t.amount);
   });
 
   const rows=[...grouped.entries()].sort((a,b)=>b[1]-a[1]);
@@ -203,22 +203,24 @@ function showReports(){
 }
 
 function render(){
-  const funds=state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+Number(t.amount||0),0);
-  const expenses=state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+Number(t.amount||0),0);
+  const funds=state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+toAmount(t.amount),0);
+  const expenses=state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+toAmount(t.amount),0);
+  const balance=funds-expenses;
   const month=today().slice(0,7);
-  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date).startsWith(month)).reduce((s,t)=>s+Number(t.amount||0),0);
+  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date||"").startsWith(month)).reduce((s,t)=>s+toAmount(t.amount),0);
   const pct=funds?Math.min(100,Math.max(0,expenses/funds*100)):0;
-  const balanceEl = document.querySelector("#balance");
-const incomeEl = document.querySelector("#incomeTotal");
+  const balanceEl=document.querySelector("#balance");
+  const incomeEl=document.querySelector("#incomeTotal");
 
-if (state.balanceVisible) {
-  balanceEl.textContent = money(balance);
-  incomeEl.textContent = `${money(funds)} income`;
-} else {
-  balanceEl.textContent = "QAR ••••••••";
-  incomeEl.textContent = "QAR •••••••• income";
-}
-  document.querySelector("#expenseTotal").textContent=`${money(expenses)} spent`;
+  if(balanceEl){
+    balanceEl.textContent=state.balanceVisible?money(balance):"QAR ••••••••";
+  }
+  if(incomeEl){
+    incomeEl.textContent=state.balanceVisible?`${money(funds)} income`:"QAR •••••••• income";
+  }
+
+  const expenseEl=document.querySelector("#expenseTotal");
+  if(expenseEl) expenseEl.textContent=`${money(expenses)} spent`;
   document.querySelector("#incomeStat").textContent=money(funds);
   document.querySelector("#monthStat").textContent=money(monthExpenses);
   document.querySelector("#spendProgress").style.width=`${pct}%`;
@@ -425,33 +427,37 @@ function setup(){
   document.querySelector('[data-nav="reports"]')?.addEventListener("click",showReports);
   document.querySelector('.nav-item:not([data-nav="reports"])')?.addEventListener("click",showHome);
   document.querySelector("#reportMonth")?.addEventListener("change",()=>{document.querySelector("#supermarketDetail")?.classList.add("d-none");renderReport();});
-document
-  .querySelector("#balanceVisibilityBtn")
-  ?.addEventListener("click", () => {
-    state.balanceVisible = !state.balanceVisible;
+const balanceVisibilityBtn=document.querySelector("#balanceVisibilityBtn");
+  if(balanceVisibilityBtn){
+    const balanceVisibilityIcon=balanceVisibilityBtn.querySelector("i");
 
-    const btn = document.querySelector("#balanceVisibilityBtn");
-    const icon = btn?.querySelector("i");
+    // Always start hidden when the app loads.
+    state.balanceVisible=false;
+    balanceVisibilityBtn.setAttribute("aria-label","Show balance");
+    balanceVisibilityBtn.setAttribute("aria-pressed","false");
+    if(balanceVisibilityIcon) balanceVisibilityIcon.className="bi bi-eye";
 
-    if (state.balanceVisible) {
-      btn?.setAttribute("aria-label", "Hide balance");
-      btn?.setAttribute("aria-pressed", "true");
+    balanceVisibilityBtn.addEventListener("click",()=>{
+      state.balanceVisible=!state.balanceVisible;
 
-      if (icon) {
-        icon.className = "bi bi-eye-slash";
+      balanceVisibilityBtn.setAttribute(
+        "aria-label",
+        state.balanceVisible?"Hide balance":"Show balance"
+      );
+      balanceVisibilityBtn.setAttribute(
+        "aria-pressed",
+        state.balanceVisible?"true":"false"
+      );
+
+      if(balanceVisibilityIcon){
+        balanceVisibilityIcon.className=state.balanceVisible
+          ?"bi bi-eye-slash"
+          :"bi bi-eye";
       }
-    } else {
-      btn?.setAttribute("aria-label", "Show balance");
-      btn?.setAttribute("aria-pressed", "false");
 
-      if (icon) {
-        icon.className = "bi bi-eye";
-      }
-    }
-
-    render();
-  });
-  
+      render();
+    });
+  }
 }
 
 const config=window.SUPABASE_CONFIG;
