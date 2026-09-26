@@ -126,14 +126,64 @@ const REPORT_GROUPS = {
 
 function reportMonthOptions(){
   const months = new Set();
-  state.transactions.filter(t=>t.type==="expense").forEach(t=>{ if(t.transaction_date) months.add(String(t.transaction_date).slice(0,7)); });
-  months.add(today().slice(0,7));
-  return [...months].sort((a,b)=>b.localeCompare(a));
+
+  state.transactions
+    .filter(t => t.type === "expense" && t.transaction_date)
+    .forEach(t => {
+      const d = new Date(`${String(t.transaction_date).slice(0,10)}T00:00:00`);
+      let y = d.getFullYear();
+      let m = d.getMonth();
+
+      // Expenses on/after the 25th belong to the next salary cycle
+      if (d.getDate() >= 25) {
+        m++;
+        if (m > 11) {
+          m = 0;
+          y++;
+        }
+      }
+
+      months.add(`${y}-${String(m + 1).padStart(2, "0")}`);
+    });
+
+  // Always include the current salary cycle
+  const today = new Date();
+  let y = today.getFullYear();
+  let m = today.getMonth();
+
+  if (today.getDate() >= 25) {
+    m++;
+    if (m > 11) {
+      m = 0;
+      y++;
+    }
+  }
+
+  months.add(`${y}-${String(m + 1).padStart(2, "0")}`);
+
+  return [...months].sort().reverse();
 }
 
 function formatMonth(key){
   const [y,m]=key.split("-");
   return new Intl.DateTimeFormat("en-US",{month:"long",year:"numeric"}).format(new Date(Number(y),Number(m)-1,1));
+}
+
+function reportCycleForMonth(key){
+  const [y, m] = key.split("-").map(Number);
+
+  // Salary cycle: previous month's 25th → selected month's 25th
+  const start = new Date(y, m - 2, 25);
+  const end = new Date(y, m - 1, 25);
+
+  const pad = n => String(n).padStart(2, "0");
+  const iso = d =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  return {
+    start: iso(start),
+    end: iso(end)
+  };
 }
 
 function renderReport(){
@@ -145,7 +195,15 @@ function renderReport(){
   select.innerHTML=options.map(m=>`<option value="${m}">${formatMonth(m)}</option>`).join("");
   select.value=current;
 
-  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date||"").startsWith(current));
+  const { start, end } = reportCycleForMonth(current);
+
+const monthExpenses = state.transactions.filter(t => {
+  if (t.type !== "expense" || !t.transaction_date) return false;
+
+  const date = String(t.transaction_date).slice(0, 10);
+
+  return date >= start && date < end;
+});
   const total=monthExpenses.reduce((sum,t)=>sum+toAmount(t.amount),0);
   document.querySelector("#reportTotal").textContent=money(total);
   document.querySelector("#reportExpenseCount").textContent=`${monthExpenses.length} expense${monthExpenses.length===1?"":"s"}`;
