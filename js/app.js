@@ -34,7 +34,8 @@ const state = {
   channel: null,
   loading: false,
   page: 1,
-  balanceVisible: false
+  balanceVisible: false,
+  dashboardMonth: null
 };
 const PAGE_SIZE = 10;
 let db = null;
@@ -186,6 +187,29 @@ function reportCycleForMonth(key){
   };
 }
 
+function getDashboardCycle(){
+  if(!state.dashboardMonth){
+    const months=reportMonthOptions();
+    state.dashboardMonth=months[0] || today().slice(0,7);
+  }
+  return reportCycleForMonth(state.dashboardMonth);
+}
+
+function renderDashboardMonthOptions(){
+  const select=document.querySelector("#dashboardMonth");
+  if(!select)return;
+
+  const months=reportMonthOptions();
+  if(!months.length)return;
+
+  if(!state.dashboardMonth || !months.includes(state.dashboardMonth)){
+    state.dashboardMonth=months[0];
+  }
+
+  select.innerHTML=months.map(m=>`<option value="${m}">${formatMonth(m)}</option>`).join("");
+  select.value=state.dashboardMonth;
+}
+
 function renderReport(){
   const select=document.querySelector("#reportMonth");
   const list=document.querySelector("#reportCategories");
@@ -261,11 +285,20 @@ function showReports(){
 }
 
 function render(){
-  const funds=state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+toAmount(t.amount),0);
-  const expenses=state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+toAmount(t.amount),0);
+  renderDashboardMonthOptions();
+
+  const {start,end}=getDashboardCycle();
+
+  const cycleTransactions=state.transactions.filter(t=>{
+    if(!t.transaction_date)return false;
+    const date=String(t.transaction_date).slice(0,10);
+    return date>=start && date<end;
+  });
+
+  const funds=cycleTransactions.filter(t=>t.type==="income").reduce((s,t)=>s+toAmount(t.amount),0);
+  const expenses=cycleTransactions.filter(t=>t.type==="expense").reduce((s,t)=>s+toAmount(t.amount),0);
   const balance=funds-expenses;
-  const month=today().slice(0,7);
-  const monthExpenses=state.transactions.filter(t=>t.type==="expense"&&String(t.transaction_date||"").startsWith(month)).reduce((s,t)=>s+toAmount(t.amount),0);
+  const monthExpenses=expenses;
   const pct=funds?Math.min(100,Math.max(0,expenses/funds*100)):0;
   const balanceEl=document.querySelector("#balance");
   const incomeEl=document.querySelector("#incomeTotal");
@@ -285,7 +318,7 @@ function render(){
   document.querySelector("#progressLabel").textContent=funds?`${pct.toFixed(1)}% of income spent`:"Add income to start tracking spending";
 
   const listEl=document.querySelector("#transactions");
-  const ordered=[...state.transactions].sort((a,b)=>String(b.transaction_date||"").localeCompare(String(a.transaction_date||""))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
+  const ordered=[...cycleTransactions].sort((a,b)=>String(b.transaction_date||"").localeCompare(String(a.transaction_date||""))||String(b.created_at||"").localeCompare(String(a.created_at||"")));
   const totalPages=Math.max(1,Math.ceil(ordered.length/PAGE_SIZE));
   state.page=Math.min(Math.max(1,state.page),totalPages);
   const pageItems=ordered.slice((state.page-1)*PAGE_SIZE,state.page*PAGE_SIZE);
@@ -485,6 +518,11 @@ function setup(){
   document.querySelector('[data-nav="reports"]')?.addEventListener("click",showReports);
   document.querySelector('.nav-item:not([data-nav="reports"])')?.addEventListener("click",showHome);
   document.querySelector("#reportMonth")?.addEventListener("change",()=>{document.querySelector("#supermarketDetail")?.classList.add("d-none");renderReport();});
+  document.querySelector("#dashboardMonth")?.addEventListener("change",e=>{
+    state.dashboardMonth=e.target.value;
+    state.page=1;
+    render();
+  });
 const balanceVisibilityBtn=document.querySelector("#balanceVisibilityBtn");
   if(balanceVisibilityBtn){
     const balanceVisibilityIcon=balanceVisibilityBtn.querySelector("i");
