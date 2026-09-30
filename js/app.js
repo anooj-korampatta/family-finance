@@ -195,6 +195,38 @@ function getDashboardCycle(){
   return reportCycleForMonth(state.dashboardMonth);
 }
 
+function cycleTransactionsFor(key){
+  const {start,end}=reportCycleForMonth(key);
+  return state.transactions.filter(t=>{
+    if(!t.transaction_date)return false;
+    const date=String(t.transaction_date).slice(0,10);
+    return date>=start && date<end;
+  });
+}
+
+function previousCycleKey(key){
+  const [y,m]=key.split("-").map(Number);
+  const d=new Date(y,m-2,25);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+
+function cycleSummary(key){
+  const tx=cycleTransactionsFor(key);
+  const income=tx.filter(t=>t.type==="income").reduce((s,t)=>s+toAmount(t.amount),0);
+  const expense=tx.filter(t=>t.type==="expense").reduce((s,t)=>s+toAmount(t.amount),0);
+  return {income,expense,balance:income-expense,transactions:tx};
+}
+
+function cycleLabel(key){
+  const {start,end}=reportCycleForMonth(key);
+  const [sy,sm,sd]=start.split("-").map(Number);
+  const startDate=new Date(sy,sm-1,sd);
+  const endDate=new Date(`${end}T00:00:00`);
+  endDate.setDate(endDate.getDate()-1);
+  const fmt=d=>d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"});
+  return `${fmt(startDate)} – ${fmt(endDate)}`;
+}
+
 function renderDashboardMonthOptions(){
   const select=document.querySelector("#dashboardMonth");
   if(!select)return;
@@ -287,17 +319,13 @@ function showReports(){
 function render(){
   renderDashboardMonthOptions();
 
-  const {start,end}=getDashboardCycle();
+  getDashboardCycle();
 
-  const cycleTransactions=state.transactions.filter(t=>{
-    if(!t.transaction_date)return false;
-    const date=String(t.transaction_date).slice(0,10);
-    return date>=start && date<end;
-  });
-
-  const funds=cycleTransactions.filter(t=>t.type==="income").reduce((s,t)=>s+toAmount(t.amount),0);
-  const expenses=cycleTransactions.filter(t=>t.type==="expense").reduce((s,t)=>s+toAmount(t.amount),0);
-  const balance=funds-expenses;
+  const currentSummary=cycleSummary(state.dashboardMonth);
+  const cycleTransactions=currentSummary.transactions;
+  const funds=currentSummary.income;
+  const expenses=currentSummary.expense;
+  const balance=currentSummary.balance;
   const monthExpenses=expenses;
   const pct=funds?Math.min(100,Math.max(0,expenses/funds*100)):0;
   const balanceEl=document.querySelector("#balance");
@@ -312,6 +340,15 @@ function render(){
 
   const expenseEl=document.querySelector("#expenseTotal");
   if(expenseEl) expenseEl.textContent=`${money(expenses)} spent`;
+
+  const previousKey=previousCycleKey(state.dashboardMonth);
+  const previousSummary=cycleSummary(previousKey);
+  const previousSavedEl=document.querySelector("#previousSaved");
+  const previousSavedPeriodEl=document.querySelector("#previousSavedPeriod");
+
+  if(previousSavedEl) previousSavedEl.textContent=money(previousSummary.balance);
+  if(previousSavedPeriodEl) previousSavedPeriodEl.textContent=cycleLabel(previousKey);
+
   document.querySelector("#incomeStat").textContent=money(funds);
   document.querySelector("#monthStat").textContent=money(monthExpenses);
   document.querySelector("#spendProgress").style.width=`${pct}%`;
